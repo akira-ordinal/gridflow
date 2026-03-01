@@ -2,13 +2,10 @@
 
 /**
  * GridFlow ダッシュボード - メインコンポーネント
- * 配置先: src/app/dashboard/page.jsx (または src/components/Dashboard.jsx)
- *
- * 依存:
- *   npm install recharts lucide-react
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ReferenceLine, ResponsiveContainer, CartesianGrid
@@ -135,6 +132,8 @@ const RISK_PRESETS = {
 // ─── メインダッシュボード ─────────────────────────────
 
 export default function Dashboard() {
+  const router = useRouter();
+  
   // フォーム状態
   const [symbol,     setSymbol]     = useState('btc_jpy');
   const [risk,       setRisk]       = useState('low');
@@ -161,6 +160,36 @@ export default function Dashboard() {
   );
 
   const intervalsRef = useRef({});
+
+  // ── BitTradeからリアルタイム価格取得 ──────
+  useEffect(() => {
+    const fetchPrice = async () => {
+      try {
+        const res = await fetch('https://api-cloud.bittrade.co.jp/market/detail/merged?symbol=btcjpy');
+        const data = await res.json();
+        if (data.tick?.close) {
+          setCurrentPrice(Math.round(data.tick.close));
+        }
+      } catch (err) {
+        console.error('価格取得エラー:', err);
+      }
+    };
+    
+    fetchPrice();
+    const interval = setInterval(fetchPrice, 10000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // ── ログアウト処理 ──────────────────────────
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+    } catch (err) {
+      console.error('ログアウトエラー:', err);
+    }
+  };
 
   // ── 試算更新 ────────────────────────────────────────
   const estimate = (upperPrice && lowerPrice && upperPrice > lowerPrice)
@@ -193,7 +222,6 @@ export default function Dashboard() {
     addLog(`ボット起動 — グリッド${gridCount}本 / 予算¥${budget.toLocaleString()}`);
     addLog(`上限¥${upperPrice.toLocaleString()} → 下限¥${lowerPrice.toLocaleString()}`);
 
-    // ★ 実際のAPIコール（dryRun=true で安全）
     try {
       const res = await fetch('/api/bot/start', {
         method: 'POST',
@@ -223,7 +251,6 @@ export default function Dashboard() {
   useEffect(() => {
     if (!running) return;
 
-    // 価格ランダムウォーク
     const priceTimer = setInterval(() => {
       setCurrentPrice(prev => {
         const next = Math.round(prev * (1 + (Math.random() - 0.5) * 0.006));
@@ -232,7 +259,6 @@ export default function Dashboard() {
       });
     }, 3000);
 
-    // 約定シミュレーション
     const tradeTimer = setInterval(() => {
       if (Math.random() > 0.25) return;
       setLevels(prev => {
@@ -256,7 +282,6 @@ export default function Dashboard() {
       });
     }, 8000);
 
-    // 稼働時間
     const uptimeTimer = setInterval(() => {
       setStartTime(s => {
         const sec = Math.floor((Date.now() - s) / 1000);
@@ -306,6 +331,22 @@ export default function Dashboard() {
             }}
           >
             {running ? '■ STOP' : '▶ START'}
+          </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: '6px 16px',
+              borderRadius: 20,
+              border: '1px solid #64748b',
+              background: 'transparent',
+              color: '#64748b',
+              fontFamily: 'monospace',
+              fontSize: 12,
+              cursor: 'pointer',
+              letterSpacing: 1,
+            }}
+          >
+            LOGOUT
           </button>
         </div>
       </div>
