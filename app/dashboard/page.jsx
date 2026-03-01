@@ -167,10 +167,12 @@ export default function Dashboard() {
       try {
         const res = await fetch('https://api-cloud.bittrade.co.jp/market/detail/merged?symbol=btcjpy');
         const data = await res.json();
-        if (data.tick?.close) {
-          setCurrentPrice(Math.round(data.tick.close));
-        }
-      } catch (err) {
+        
+      } catch (err) {if (data.tick?.close) {
+  const newPrice = Math.round(data.tick.close);
+  setCurrentPrice(newPrice);
+  setPriceHistory(prev => [...prev.slice(-19), { t: Date.now(), price: newPrice }]);
+}
         console.error('価格取得エラー:', err);
       }
     };
