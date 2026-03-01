@@ -155,9 +155,7 @@ export default function Dashboard() {
   ]);
 
   // 価格履歴（チャート用）
-  const [priceHistory, setPriceHistory] = useState(
-    Array.from({ length: 20 }, (_, i) => ({ t: i, price: 14500000 }))
-  );
+  const [priceHistory, setPriceHistory] = useState([]);
 
   const intervalsRef = useRef({});
 
@@ -167,12 +165,19 @@ export default function Dashboard() {
       try {
         const res = await fetch('https://api-cloud.bittrade.co.jp/market/detail/merged?symbol=btcjpy');
         const data = await res.json();
-        
-      } catch (err) {if (data.tick?.close) {
-  const newPrice = Math.round(data.tick.close);
-  setCurrentPrice(newPrice);
-  setPriceHistory(prev => [...prev.slice(-19), { t: Date.now(), price: newPrice }]);
-}
+        if (data.tick?.close) {
+          const newPrice = Math.round(data.tick.close);
+          setCurrentPrice(newPrice);
+          
+          // チャートの初期化（初回のみ）
+          setPriceHistory(prev => {
+            if (prev.length === 0) {
+              return Array.from({ length: 20 }, (_, i) => ({ t: Date.now() - (19 - i) * 10000, price: newPrice }));
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
         console.error('価格取得エラー:', err);
       }
     };
